@@ -1,0 +1,11 @@
+.ruff_cache/
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.cache/
+.mypy_cache/
+.pytest_cache/
+.venv/

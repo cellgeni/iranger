@@ -1,0 +1,33 @@
+[build-system]
+requires = ["flit"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "iranger"
+description = "A Python package for reading 10x results directly from iRODS"
+authors = [{ name = "Martin Pret", email = "mp33@sanger.ac.uk" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+dynamic = ["version"]
+dependencies = [
+    "anndata",
+    "h5py",
+    "python-irodsclient",
+    "pandas",
+    "scipy"
+]
+
+
+[project.urls]
+Source = "https://github.com/cellgeni/iranger"
+
+[project.optional-dependencies]
+dev = ["ruff"]
+
+[tool.flit.module]
+name = "iranger"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
