@@ -101,7 +101,7 @@ class iRanger(object):
         """
         return iRODSSession(irods_env_file=self.irods_environment, password=self.password)
 
-    def _read_feature_matrix_as_anndata(self, collection_path):
+    def _read_feature_matrix_as_anndata(self, collection_path,count_file="filtered_feature_bc_matrix.h5"):
         """
         Reads a filtered_feature_bc_matrix.h5 file from a given 10x output in an iRODS collection.
 
@@ -113,7 +113,7 @@ class iRanger(object):
         """
         self.log(f"Redaing feature matrix as AnnData", True)
         with self._get_session() as session:
-            filtered_matrix_h5 = os.path.join(collection_path, "filtered_feature_bc_matrix.h5")
+            filtered_matrix_h5 = os.path.join(collection_path, count_file)
             self.log(f"Redaing {filtered_matrix_h5}", True)
             if not session.data_objects.exists(filtered_matrix_h5):
                 raise FileNotFoundError(f"Missing '{filtered_matrix_h5}'")
@@ -174,7 +174,7 @@ class iRanger(object):
                     adata.uns["_h5_metadata"] = dict(f.attrs)
                     return adata
 
-    def read(self, collection_path):
+    def read(self, collection_path,count_file="filtered_feature_bc_matrix.h5"):
         """
         Generic reader that detects the type of 10x analysis and calls the appropriate object reader.
 
@@ -200,17 +200,17 @@ class iRanger(object):
 
         self.log(f"Detected analysis_type={analysis_type}")
         if "cellranger count" in analysis_type:
-            return self.read_cellranger(collection_path)
+            return self.read_cellranger(collection_path,count_file)
         elif "spaceranger count" in analysis_type:
-            return self.read_spaceranger(collection_path)
+            return self.read_spaceranger(collection_path,count_file)
         elif "cellranger-arc count" in analysis_type:
-            return self.read_cellranger_arc(collection_path)
+            return self.read_cellranger_arc(collection_path,count_file)
         else:
             raise TypeError(
                 f"Couldn't detect 10x analysis '{analysis_type}'. Use specific function to read the collection. For example: read_spaceranger(...)"
             )
 
-    def read_cellranger(self, collection_path):
+    def read_cellranger(self, collection_path,count_file="filtered_feature_bc_matrix.h5"):
         """
         Reads a cellranger output.
 
@@ -220,10 +220,10 @@ class iRanger(object):
         Returns:
             anndata.AnnData: AnnData object with gene expression data.
         """
-        adata = self._read_feature_matrix_as_anndata(collection_path)
+        adata = self._read_feature_matrix_as_anndata(collection_path,count_file)
         return adata
 
-    def read_spaceranger(self, collection_path):
+    def read_spaceranger(self, collection_path,count_file="filtered_feature_bc_matrix.h5"):
         """
         Reads a spaceranger output including spatial metadata and images.
 
@@ -233,7 +233,7 @@ class iRanger(object):
         Returns:
             anndata.AnnData: AnnData object with spatial transcriptomics data.
         """
-        adata = self._read_feature_matrix_as_anndata(collection_path)
+        adata = self._read_feature_matrix_as_anndata(collection_path,count_file)
         adata.uns["spatial"] = dict()
         library_id = str(adata.uns["_h5_metadata"].pop("library_ids")[0], "utf-8")
         adata.uns["spatial"][library_id] = dict()
@@ -301,7 +301,7 @@ class iRanger(object):
             }
             return adata
 
-    def read_cellranger_arc(self, collection_path):
+    def read_cellranger_arc(self, collection_path,count_file="filtered_feature_bc_matrix.h5"):
         """
         Reads cellranger-arc output including peak annotation from iRODS into an AnnData object.
 
@@ -311,7 +311,7 @@ class iRanger(object):
         Returns:
             anndata.AnnData: AnnData object with ATAC annotations.
         """
-        adata = self._read_feature_matrix_as_anndata(collection_path)
+        adata = self._read_feature_matrix_as_anndata(collection_path,count_file)
         if "atac" not in adata.uns:
             adata.uns["atac"] = dict()
 
