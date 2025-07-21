@@ -23,6 +23,9 @@ adata = ir.read("/seq/26280/cellranger/cellranger302_count_26280_FCAImmP7555847_
 # load 10x spaceranger output
 adata = ir.read("/seq/illumina/spaceranger/spaceranger130_count__WSSKNKCLsp12887269_GRCh38-2020-A")
 
+# load 10x spaceranger output with *raw counts*
+adata_raw = ir.read("/seq/illumina/spaceranger/spaceranger130_count__WSSKNKCLsp12887269_GRCh38-2020-A", count_file="raw_feature_bc_matrix.h5")
+
 # load 10x cellranger-arc output
 adata = ir.read("/seq/illumina/cellranger-arc/cellranger-arc101_count_1408ea687d742c7b571c62c7f441d372")
 # if you only want gene experession
