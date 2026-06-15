@@ -21,6 +21,9 @@ ir = iranger.setup(password='Your_iRODS_Password_Goes_Here')
 # load 10x cellranger output
 adata = ir.read("/seq/26280/cellranger/cellranger302_count_26280_FCAImmP7555847_GRCh38-1_2_0")
 
+# load mtx/barcode/feature format, for example starsolo
+adata = ir.read_starsolo("/archive/cellgeni/datasets/GSE157329/GSE157329_Emb.06-limb/output/GeneFull/filtered")
+
 # load 10x spaceranger output
 adata = ir.read("/seq/illumina/spaceranger/spaceranger130_count__WSSKNKCLsp12887269_GRCh38-2020-A")
 
@@ -29,6 +32,7 @@ adata_raw = ir.read("/seq/illumina/spaceranger/spaceranger130_count__WSSKNKCLsp1
 
 # load 10x cellranger-arc output
 adata = ir.read("/seq/illumina/cellranger-arc/cellranger-arc101_count_1408ea687d742c7b571c62c7f441d372")
+
 # if you only want gene experession
 adata_gex = adata[:, adata.var["feature_types"]=="Gene Expression"]
 ```
