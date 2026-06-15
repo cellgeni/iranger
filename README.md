@@ -12,10 +12,11 @@ pip install git+https://github.com/cellgeni/iranger.git
 ```python
 import iranger
 
+# you can use you saved credentials if you are using irods (ils/iget/iinit/etc) from command line on the same computer
+ir = iranger.setup()
+
 # You can use your password directly
 ir = iranger.setup(password='Your_iRODS_Password_Goes_Here')
-# ...or alternatively put your password in a file and use that instead
-ir = iranger.setup(password_file='~/my_password_file')
 
 # load 10x cellranger output
 adata = ir.read("/seq/26280/cellranger/cellranger302_count_26280_FCAImmP7555847_GRCh38-1_2_0")

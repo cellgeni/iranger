@@ -24,14 +24,13 @@ class iRanger(object):
     to load and 10x tools outputs into AnnData objects.
     """
 
-    def __init__(self, irods_environment=None, password=None, password_file=None, verbose=False):
+    def __init__(self, irods_environment=None, password=None, verbose=False):
         """
         Initializes an iRanger instance.
 
         Args:
             irods_environment (str): Path to the iRODS environment JSON file.
             password (str): Password string for iRODS login.
-            password_file (str): Path to a file containing the iRODS password.
             verbose (bool): Flag to enable verbose logging.
         """
         self.verbose = verbose
@@ -50,18 +49,17 @@ class iRanger(object):
         if not os.path.exists(self.irods_environment):
             raise FileNotFoundError(f"iRODS environment file not found: {self.irods_environment}")
 
-        # read password or password_file
-        if password is None and password_file is None:
-            self.log("No password provided, manual input required", True)
-            self.password = self._get_password()
+        # check whether password file created by iinit exists, if not prompt for password
+        if os.path.exists(iRODSSession.get_irods_password_file()):
+            self.log("Using default password file made by iinit", True) # do not need to record the path as irods will read it automatically
         elif password is not None:
             self.log("Using provided password", True)
             self.password = password
-        elif password_file is not None:
-            self.log("Using provided password_file", True)
-            password_file = os.path.expanduser(password_file)
-            with open(password_file, mode="rt") as pf:
-                self.password = pf.read().strip()
+        else:
+            self.log("No password provided, prompting for password", True)
+            self.password = self._get_password()
+
+
 
         # smoke test to make sure connection works
         self.check_connection()
@@ -99,7 +97,10 @@ class iRanger(object):
         Returns:
             iRODSSession: The iRODS session object.
         """
-        return iRODSSession(irods_env_file=self.irods_environment, password=self.password)
+        kwargs ={}
+        if hasattr(self, 'password'):
+            kwargs['password'] = self.password
+        return iRODSSession(irods_env_file=self.irods_environment, **kwargs)
 
     def _read_feature_matrix_as_anndata(self, collection_path, count_file="filtered_feature_bc_matrix.h5"):
         """
