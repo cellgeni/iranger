@@ -2,6 +2,9 @@ import getpass
 import json
 import os
 from importlib.metadata import version
+import gzip
+import io
+import scipy.io
 
 import anndata
 import h5py
@@ -79,7 +82,7 @@ class iRanger(object):
         with self._get_session() as session:
             self.log(
                 f"Connected to host '{session.host}:{session.port}' server version {'.'.join(map(str, session.server_version))} as user '{session.username}'"
-            )
+            , True)
 
     def _get_password(self):
         """
@@ -120,7 +123,7 @@ class iRanger(object):
             if not session.data_objects.exists(filtered_matrix_h5):
                 raise FileNotFoundError(f"Missing '{filtered_matrix_h5}'")
             filtered_feature_bc_matrix = session.data_objects.get(filtered_matrix_h5)
-            self.log(f"Retrieving {filtered_feature_bc_matrix}")
+            self.log(f"Retrieving {filtered_feature_bc_matrix}", True)
             with filtered_feature_bc_matrix.open("r") as h5:
                 with h5py.File(h5, "r") as f:
                     self.log("Reading matrix elements from h5", True)
@@ -141,7 +144,7 @@ class iRanger(object):
                     if len(set(var["feature_types"])) != 1:
                         self.log(
                             f"Multiple feature_types. You may want to filter them to only have `var.feature_types == 'Gene Expression'`."
-                        )
+                        , True)
 
                     if "gene_id" not in features:
                         self.log("'gene_id' not in features, using 'id' as 'gene_id'", True)
@@ -156,7 +159,7 @@ class iRanger(object):
                         self.log("found 'interval' in features (likely ATAC data)", True)
                         var["interval"] = np.array(features["interval"]).astype(str)
 
-                    self.log("Creating AnnData file")
+                    self.log("Creating AnnData file", True)
                     adata = anndata.AnnData(X=mtx, obs={"obs_names": barcodes}, var=var)
 
                     self.log("Adding irods metadata to uns", True)
@@ -201,7 +204,7 @@ class iRanger(object):
                     "No 'analysis_type' metadata in iRODS collection. Use specific function to read the collection. For example: read_spaceranger('/seq/path/to/spaceranger')"
                 )
 
-        self.log(f"Detected analysis_type={analysis_type}")
+        self.log(f"Detected analysis_type={analysis_type}", True)
         if "cellranger count" in analysis_type:
             return self.read_cellranger(collection_path, count_file)
         elif "spaceranger count" in analysis_type:
@@ -325,7 +328,7 @@ class iRanger(object):
 
         with self._get_session() as session:
             if session.data_objects.exists(peak_annotation_tsv):
-                self.log("Parsing peak annotation file")
+                self.log("Parsing peak annotation file", True)
                 peak_annotation = session.data_objects.get(peak_annotation_tsv)
                 with peak_annotation.open("r") as pa:
                     adata.uns["atac"]["peak_annotation"] = pd.read_csv(pa, sep="\t")
@@ -363,3 +366,87 @@ class iRanger(object):
                     }
                 )
             return results
+
+    def read_starsolo(self, collection_path):
+        """
+        Reads a STARsolo output from an iRODS collection containing
+        barcodes.tsv.gz, features.tsv.gz, and matrix.mtx.gz files.
+
+        Args:
+            collection_path (str): The iRODS collection path to the folder
+                                containing barcodes.tsv.gz, features.tsv.gz,
+                                and matrix.mtx.gz.
+
+        Returns:
+            anndata.AnnData: AnnData object with the parsed single-cell data. var_names are set to gene_ids (aka ensembl ids).
+        """
+        self.log(f"Reading STARsolo output from {collection_path}", True)
+
+        with self._get_session() as session:
+            if not session.collections.exists(collection_path):
+                raise FileNotFoundError(f"Collection '{collection_path}' not found")
+
+            required_files = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
+            for fname in required_files:
+                fpath = os.path.join(collection_path, fname)
+                if not session.data_objects.exists(fpath):
+                    raise FileNotFoundError(f"Missing required file: '{fpath}'")
+
+            # read barcodes
+            self.log("Reading barcodes.tsv.gz", True)
+            barcodes_obj = session.data_objects.get(os.path.join(collection_path, "barcodes.tsv.gz"))
+            with barcodes_obj.open("r") as f:
+                with gzip.open(f, "rt") as gz:
+                    barcodes = [line.strip() for line in gz]
+
+            # read features
+            self.log("Reading features.tsv.gz", True)
+            features_obj = session.data_objects.get(os.path.join(collection_path, "features.tsv.gz"))
+            with features_obj.open("r") as f:
+                with gzip.open(f, "rt") as gz:
+                    features_rows = [line.strip().split("\t") for line in gz]
+
+            gene_ids = [row[0] for row in features_rows]
+            gene_names = [row[1] if len(row) > 1 else row[0] for row in features_rows]
+            feature_types = [row[2] if len(row) > 2 else "Gene Expression" for row in features_rows]
+
+            if len(set(feature_types)) != 1:
+                self.log(
+                    "Multiple feature_types detected. You may want to filter to only `var.feature_types == 'Gene Expression'`."
+                )
+
+            # read matrix
+            self.log("Reading matrix.mtx.gz", True)
+            matrix_obj = session.data_objects.get(os.path.join(collection_path, "matrix.mtx.gz"))
+            with matrix_obj.open("r") as f:
+                with gzip.open(f, "rb") as gz:
+                    mtx = scipy.io.mmread(io.BytesIO(gz.read()))
+
+            # mtx.mtx is (genes x barcodes), transpose to (barcodes x genes)
+            mtx = scipy.sparse.csr_matrix(mtx.T)
+
+            self.log("Creating AnnData object", True)
+            var = pd.DataFrame(
+                {
+                    "gene_ids": gene_names,
+                    "feature_types": feature_types,
+                },
+                index=gene_ids,
+            )
+            obs = pd.DataFrame(index=barcodes)
+
+            adata = anndata.AnnData(X=mtx, obs=obs, var=var)
+
+            self.log("Adding iRODS metadata to uns", True)
+            adata.uns["_irods"] = {"path": collection_path, "metadata": []}
+            for item in session.collections.get(collection_path).metadata.items():
+                adata.uns["_irods"]["metadata"].append({item.name: item.value})
+
+            self.log("Adding package version information to uns", True)
+            adata.uns["_iranger_versions"] = {
+                "iranger": version("iranger"),
+                "anndata": version("anndata"),
+                "pandas": version("pandas"),
+            }
+
+            return adata
