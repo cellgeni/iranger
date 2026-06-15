@@ -54,15 +54,15 @@ class iRanger(object):
 
         # check whether password file created by iinit exists, if not prompt for password
         if os.path.exists(iRODSSession.get_irods_password_file()):
-            self.log("Using default password file made by iinit", True) # do not need to record the path as irods will read it automatically
+            self.log(
+                "Using default password file made by iinit", True
+            )  # do not need to record the path as irods will read it automatically
         elif password is not None:
             self.log("Using provided password", True)
             self.password = password
         else:
             self.log("No password provided, prompting for password", True)
             self.password = self._get_password()
-
-
 
         # smoke test to make sure connection works
         self.check_connection()
@@ -81,8 +81,9 @@ class iRanger(object):
         self.log("Checking iRODS connecting", True)
         with self._get_session() as session:
             self.log(
-                f"Connected to host '{session.host}:{session.port}' server version {'.'.join(map(str, session.server_version))} as user '{session.username}'"
-            , True)
+                f"Connected to host '{session.host}:{session.port}' server version {'.'.join(map(str, session.server_version))} as user '{session.username}'",
+                True,
+            )
 
     def _get_password(self):
         """
@@ -100,9 +101,9 @@ class iRanger(object):
         Returns:
             iRODSSession: The iRODS session object.
         """
-        kwargs ={}
-        if hasattr(self, 'password'):
-            kwargs['password'] = self.password
+        kwargs = {}
+        if hasattr(self, "password"):
+            kwargs["password"] = self.password
         return iRODSSession(irods_env_file=self.irods_environment, **kwargs)
 
     def _read_feature_matrix_as_anndata(self, collection_path, count_file="filtered_feature_bc_matrix.h5"):
@@ -143,8 +144,9 @@ class iRanger(object):
                     var["feature_types"] = features["feature_type"][:].astype(str)
                     if len(set(var["feature_types"])) != 1:
                         self.log(
-                            f"Multiple feature_types. You may want to filter them to only have `var.feature_types == 'Gene Expression'`."
-                        , True)
+                            f"Multiple feature_types. You may want to filter them to only have `var.feature_types == 'Gene Expression'`.",
+                            True,
+                        )
 
                     if "gene_id" not in features:
                         self.log("'gene_id' not in features, using 'id' as 'gene_id'", True)
