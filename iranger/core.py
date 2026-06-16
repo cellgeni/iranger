@@ -9,7 +9,6 @@ import scipy.io
 import anndata
 import h5py
 import irods.client_configuration
-import matplotlib.image
 import numpy as np
 import pandas as pd
 import scipy.sparse
@@ -52,16 +51,16 @@ class iRanger(object):
         if not os.path.exists(self.irods_environment):
             raise FileNotFoundError(f"iRODS environment file not found: {self.irods_environment}")
 
-        # check whether password file created by iinit exists, if not prompt for password
-        if os.path.exists(iRODSSession.get_irods_password_file()):
+        # check if password provided or password file created by iinit exists, if not prompt for password
+        if password is not None:
+            self.log("Using provided password", True)
+            self.password = password
+        elif os.path.exists(iRODSSession.get_irods_password_file()):
             self.log(
                 "Using default password file made by iinit", True
             )  # do not need to record the path as irods will read it automatically
-        elif password is not None:
-            self.log("Using provided password", True)
-            self.password = password
         else:
-            self.log("No password provided, prompting for password", True)
+            self.log("No iRODS password file found and no password provided. Prompting for password", True)
             self.password = self._get_password()
 
         # smoke test to make sure connection works
@@ -80,10 +79,9 @@ class iRanger(object):
         """
         self.log("Checking iRODS connecting", True)
         with self._get_session() as session:
-            self.log(
-                f"Connected to host '{session.host}:{session.port}' server version {'.'.join(map(str, session.server_version))} as user '{session.username}'",
-                True,
-            )
+            _version = ".".join(map(str, session.server_version))
+            _host = f"{session.host}:{session.port}"
+            self.log(f"Connected to host '{_host}' server version {_version} as user '{session.username}'", True)
 
     def _get_password(self):
         """
@@ -243,6 +241,8 @@ class iRanger(object):
         Returns:
             anndata.AnnData: AnnData object with spatial transcriptomics data.
         """
+        import matplotlib.image
+        
         adata = self._read_feature_matrix_as_anndata(collection_path, count_file)
         adata.uns["spatial"] = dict()
         library_id = str(adata.uns["_h5_metadata"].pop("library_ids")[0], "utf-8")
