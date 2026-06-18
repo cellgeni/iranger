@@ -430,7 +430,7 @@ class iRanger(object):
             self.log("Creating AnnData object", True)
             var = pd.DataFrame(
                 {
-                    "gene_ids": gene_names,
+                    "gene_name": gene_names,
                     "feature_types": feature_types,
                 },
                 index=gene_ids,
